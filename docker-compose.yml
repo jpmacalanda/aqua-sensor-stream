@@ -27,8 +27,19 @@ services:
     volumes:
       - ./api/data:/app/data
       - ./api/logs:/app/logs
+    # Make sure it listens on all interfaces
+    environment:
+      - PORT=3001
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
+    # Add healthcheck to verify the API is responsive
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:3001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
