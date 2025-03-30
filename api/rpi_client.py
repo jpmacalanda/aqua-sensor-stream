@@ -101,11 +101,60 @@ def find_arduino_port():
     return None
 
 def check_api_connection():
-    # ... keep existing code (API connection checking function)
+    """Check if the API is reachable and return working URL"""
+    logging.info(f"Checking API connectivity...")
+    
+    # First try the primary API URL
+    try:
+        logging.info(f"Testing primary API URL: {API_URL}")
+        response = requests.get(API_URL.replace('/readings', ''), timeout=2)
+        if response.status_code == 200:
+            logging.info(f"✅ Primary API URL is working: {API_URL}")
+            return API_URL
+    except requests.exceptions.RequestException as e:
+        logging.warning(f"❌ Primary API URL failed: {str(e)}")
+    
+    # Try alternatives
+    for alt_url in ALTERNATIVE_API_URLS:
+        try:
+            logging.info(f"Testing alternative API URL: {alt_url}")
+            response = requests.get(alt_url.replace('/readings', ''), timeout=2)
+            if response.status_code == 200:
+                logging.info(f"✅ Alternative API URL is working: {alt_url}")
+                return alt_url
+        except requests.exceptions.RequestException as e:
+            logging.warning(f"❌ Alternative API URL failed: {str(e)}")
+    
+    logging.error("❌ All API URLs failed. Cannot connect to API server.")
+    return None
     
 def list_serial_ports():
     """List all available serial ports"""
-    # ... keep existing code (serial port listing function)
+    ports = []
+    
+    if sys.platform.startswith('win'):
+        # Windows
+        for i in range(256):
+            try:
+                port = f'COM{i}'
+                s = serial.Serial(port)
+                s.close()
+                ports.append(port)
+                logging.info(f"Found port: {port}")
+            except (OSError, serial.SerialException):
+                pass
+    else:
+        # Linux/Mac
+        for pattern in ['/dev/ttyS*', '/dev/ttyUSB*', '/dev/ttyACM*', '/dev/tty.*', '/dev/cu.*']:
+            ports.extend(glob.glob(pattern))
+        
+        if ports:
+            for port in ports:
+                logging.info(f"Found port: {port}")
+        else:
+            logging.warning("No serial ports found")
+    
+    return ports
 
 def test_read_from_port(port, attempts=3):
     """Test reading from a port to see if it returns valid sensor data"""

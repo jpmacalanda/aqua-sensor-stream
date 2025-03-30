@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from "sonner";
@@ -246,6 +245,79 @@ export function useSensorData() {
     }
   };
 
+  // Function to generate test data via the API's test endpoint
+  const generateTestData = async () => {
+    setIsLoading(true);
+    try {
+      // Try to find working API URL if we're disconnected
+      let currentApiUrl = apiUrl;
+      if (connectionStatus === 'disconnected') {
+        const workingUrl = await findWorkingApiUrl();
+        if (workingUrl && workingUrl !== apiUrl) {
+          setApiUrl(workingUrl);
+          currentApiUrl = workingUrl;
+          console.log(`[${new Date().toISOString()}] Switching to new API URL: ${workingUrl}`);
+        }
+      }
+      
+      console.log(`[${new Date().toISOString()}] Generating test data via ${currentApiUrl}/test`);
+      const response = await axios.get(`${currentApiUrl}/test`, { timeout: 5000 });
+      
+      if (response.status === 200) {
+        console.log(`[${new Date().toISOString()}] Test data generated successfully:`, response.data);
+        
+        // Refresh data to get the new reading
+        await fetchAllReadings();
+        
+        setConnectionStatus('connected');
+        setError(null);
+        return response.data;
+      } else {
+        throw new Error(`Unexpected status: ${response.status}`);
+      }
+    } catch (err) {
+      console.error(`[${new Date().toISOString()}] Error generating test data:`, err);
+      
+      if (axios.isAxiosError(err)) {
+        if (err.code === 'ERR_NETWORK') {
+          console.error(`[${new Date().toISOString()}] Network error - API server might be down`);
+          setConnectionStatus('disconnected');
+          
+          const workingUrl = await findWorkingApiUrl();
+          if (workingUrl && workingUrl !== apiUrl) {
+            setApiUrl(workingUrl);
+            console.log(`[${new Date().toISOString()}] Found new working API URL: ${workingUrl}`);
+            
+            // Try again with the new URL
+            try {
+              const testResponse = await axios.get(`${workingUrl}/test`, { timeout: 5000 });
+              if (testResponse.status === 200) {
+                await fetchAllReadings();
+                setConnectionStatus('connected');
+                setError(null);
+                return testResponse.data;
+              }
+            } catch (retryErr) {
+              console.error(`[${new Date().toISOString()}] Retry with new URL failed:`, retryErr);
+            }
+          }
+          
+          setError(`Cannot connect to API server at ${apiUrl}. Is it running?`);
+          toast.error("Cannot connect to API server. Check console for details.");
+        } else {
+          setError(`Failed to generate test data: ${err.message}`);
+          toast.error(`Failed to generate test data: ${err.message}`);
+        }
+      } else {
+        setError('Failed to generate test data');
+        toast.error('Failed to generate test data');
+      }
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Initial data load and connection check
   useEffect(() => {
     console.log(`[${new Date().toISOString()}] Initial connection check`);
@@ -280,6 +352,7 @@ export function useSensorData() {
     latestReading,
     allReadings,
     addReading,
+    generateTestData,
     error,
     isLoading,
     connectionStatus,
