@@ -1,11 +1,9 @@
 
 import { useState, useEffect } from 'react';
-import { getAllReadings, getLatestReading, addSensorReading } from '../services/apiService';
+import axios from 'axios';
 
-// This is a custom hook that will handle:
-// 1. Getting sensor data
-// 2. Updating sensor data (would connect to Arduino in real app)
-// 3. Providing real-time updates
+// API base URL - change this to match your setup
+const API_URL = 'http://localhost:3001/api';
 
 interface SensorData {
   pH: number;
@@ -19,53 +17,79 @@ export function useSensorData() {
   const [latestReading, setLatestReading] = useState<SensorData | null>(null);
   const [allReadings, setAllReadings] = useState<SensorData[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // For simulation purposes - this would be real Arduino data in production
-  const simulateArduinoData = () => {
-    // Generate random values within realistic ranges
-    const ph = (6 + Math.random()).toFixed(2);
-    const temp = (20 + Math.random() * 5).toFixed(2);
-    const waterLevels = ['low', 'medium', 'high'];
-    const water = waterLevels[Math.floor(Math.random() * waterLevels.length)];
-    const tds = Math.floor(600 + Math.random() * 100);
-    
-    return `pH:${ph},temp:${temp},water:${water},tds:${tds}`;
-  };
-
-  // Function to add a new reading (would receive real data from Arduino/Raspberry Pi)
-  const addReading = (dataString?: string) => {
+  // Function to fetch all readings
+  const fetchAllReadings = async () => {
+    setIsLoading(true);
     try {
-      // If no data string is provided, generate simulated data
-      const data = dataString || simulateArduinoData();
-      const newReading = addSensorReading(data);
+      const response = await axios.get(`${API_URL}/readings`);
+      setAllReadings(response.data);
       
-      if (newReading) {
-        setLatestReading(newReading);
-        setAllReadings(getAllReadings());
+      if (response.data.length > 0) {
+        setLatestReading(response.data[response.data.length - 1]);
       }
+      
+      setError(null);
     } catch (err) {
-      setError('Failed to add sensor reading');
-      console.error(err);
+      console.error('Error fetching readings:', err);
+      setError('Failed to fetch readings');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Simulate real-time data updates
-  useEffect(() => {
-    // Initial data load
-    const readings = getAllReadings();
-    if (readings.length > 0) {
-      setAllReadings(readings);
-      setLatestReading(getLatestReading());
-    } else {
-      // If no data exists, add simulated data
-      addReading();
+  // Function to fetch latest reading
+  const fetchLatestReading = async () => {
+    setIsLoading(true);
+    try {
+      const response = await axios.get(`${API_URL}/readings/latest`);
+      setLatestReading(response.data);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching latest reading:', err);
+      // Don't set error if 404 (no readings yet)
+      if (axios.isAxiosError(err) && err.response?.status !== 404) {
+        setError('Failed to fetch latest reading');
+      }
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    // Set up periodic data updates to simulate Arduino sending data
+  // Function to manually add a reading (for testing without Arduino)
+  const addReading = async (dataString?: string) => {
+    if (!dataString) {
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      const response = await axios.post(`${API_URL}/readings`, { data: dataString });
+      
+      if (response.status === 201) {
+        setLatestReading(response.data);
+        fetchAllReadings(); // Refresh the list after adding
+      }
+      
+      setError(null);
+    } catch (err) {
+      console.error('Error adding reading:', err);
+      setError('Failed to add reading');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Initial data load
+  useEffect(() => {
+    fetchAllReadings();
+    
+    // Set up interval for periodic updates
     const intervalId = setInterval(() => {
-      addReading();
-    }, 3000); // Simulate data coming in every 3 seconds
-
+      fetchLatestReading();
+    }, 5000); // Check for new data every 5 seconds
+    
     return () => clearInterval(intervalId);
   }, []);
 
@@ -73,6 +97,8 @@ export function useSensorData() {
     latestReading,
     allReadings,
     addReading,
-    error
+    error,
+    isLoading,
+    refreshData: fetchAllReadings
   };
 }

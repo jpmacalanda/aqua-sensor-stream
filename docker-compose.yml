@@ -9,3 +9,16 @@ services:
     ports:
       - "80:80"
     restart: unless-stopped
+    depends_on:
+      - api
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+    volumes:
+      - ./api/data:/app/data
+

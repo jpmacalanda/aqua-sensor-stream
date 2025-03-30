@@ -28,12 +28,11 @@ Where:
 - `water`: Water level (low, medium, high)
 - `tds`: Total Dissolved Solids in parts per million (ppm)
 
-## Hardware Setup (not included in this repo)
+## Hardware Setup
 
-For a complete system, you would need:
-1. Arduino with pH, temperature, water level, and TDS sensors
-2. Raspberry Pi connected to Arduino via USB
-3. Script on Raspberry Pi to read serial data from Arduino and send to this API
+1. Connect your Arduino with pH, temperature, water level, and TDS sensors
+2. Connect the Arduino to your Raspberry Pi via USB
+3. Make sure your Arduino code sends data in the expected format
 
 ## Deployment
 
@@ -51,48 +50,48 @@ npm run dev
 The project is fully dockerized for easy deployment:
 
 ```sh
-# Build and start the containers
+# Build and start all services
 docker-compose up -d
 
 # View logs
 docker-compose logs -f
 
-# Stop the containers
+# Stop the services
 docker-compose down
 ```
 
-### For the Raspberry Pi (conceptual)
-On your Raspberry Pi, you would need a simple script to:
+### Raspberry Pi Setup
+
+On your Raspberry Pi:
+
+1. Install required Python packages:
+```bash
+pip install pyserial requests
+```
+
+2. Copy the `api/rpi_client.py` script to your Raspberry Pi
+3. Edit the script to set the correct serial port and API URL
+4. Run the script:
+```bash
+python rpi_client.py
+```
+
+The script will:
 1. Read data from Arduino's serial port
 2. Send this data to the API endpoint
+3. Wait 5 seconds before the next reading
 
-Example Python script (not included):
-```python
-import serial
-import requests
-import time
+## API Endpoints
 
-# Connect to Arduino's serial port
-ser = serial.Serial('/dev/ttyUSB0', 9600)
-
-# API endpoint (replace with your deployed URL)
-api_url = "https://your-deployed-app.com/api/readings"
-
-while True:
-    # Read data from Arduino
-    data = ser.readline().decode('utf-8').strip()
-    
-    # Send to API
-    response = requests.post(api_url, json={"data": data})
-    
-    # Wait before next reading
-    time.sleep(5)
-```
+- `GET /api/readings` - Get all sensor readings
+- `GET /api/readings/latest` - Get the most recent reading
+- `POST /api/readings` - Add a new reading (send JSON with `data` field)
 
 ## Technologies Used
 
 - React with TypeScript
 - Tailwind CSS for styling
 - shadcn/ui for UI components
+- Node.js/Express for the API
+- LowDB for simple data storage
 - Docker for containerization
-
