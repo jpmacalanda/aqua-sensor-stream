@@ -58,6 +58,11 @@ const SensorDisplay: React.FC<SensorDisplayProps> = ({ data, isLoading = false }
     return new Date(timestamp).toLocaleTimeString();
   };
 
+  // Add a safe formatter to handle potential undefined values
+  const safeFormat = (value: number | undefined, digits: number = 2) => {
+    return value !== undefined ? value.toFixed(digits) : 'N/A';
+  };
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -68,7 +73,7 @@ const SensorDisplay: React.FC<SensorDisplayProps> = ({ data, isLoading = false }
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${getPHColor(data.pH)}`}>
-              {data.pH.toFixed(2)}
+              {safeFormat(data.pH)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Last updated at {formatTime(data.timestamp)}
@@ -83,7 +88,7 @@ const SensorDisplay: React.FC<SensorDisplayProps> = ({ data, isLoading = false }
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {data.temp.toFixed(1)} °C
+              {safeFormat(data.temp, 1)} °C
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Last updated at {formatTime(data.timestamp)}
@@ -131,7 +136,7 @@ const SensorDisplay: React.FC<SensorDisplayProps> = ({ data, isLoading = false }
         </CardHeader>
         <CardContent>
           <pre className="bg-gray-100 p-4 rounded text-sm overflow-x-auto">
-            {`pH:${data.pH.toFixed(2)},temp:${data.temp.toFixed(2)},water:${data.water},tds:${data.tds}`}
+            {`pH:${safeFormat(data.pH)},temp:${safeFormat(data.temp, 2)},water:${data.water},tds:${data.tds}`}
           </pre>
         </CardContent>
       </Card>
