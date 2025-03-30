@@ -1,69 +1,83 @@
-# Welcome to your Lovable project
+
+# Water Quality Monitoring System
+
+A real-time water quality monitoring system that receives sensor data from an Arduino connected to a Raspberry Pi.
 
 ## Project info
 
 **URL**: https://lovable.dev/projects/b50ff209-b4ca-48d2-9dd5-77fbf6808bde
 
-## How can I edit this code?
+## Features
 
-There are several ways of editing your application.
+- RESTful API service to receive and store sensor data from Arduino
+- Real-time web dashboard displaying water quality parameters
+- Visualization of pH, temperature, water level, and TDS readings
+- Manual data entry for testing without hardware
+- Auto-refresh functionality to display the most recent readings
 
-**Use Lovable**
+## Data Format
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/b50ff209-b4ca-48d2-9dd5-77fbf6808bde) and start prompting.
+The system expects data from the Arduino in the following format:
+```
+pH:6.20,temp:23.20,water:medium,tds:652
+```
 
-Changes made via Lovable will be committed automatically to this repo.
+Where:
+- `pH`: The pH level of the water
+- `temp`: Temperature in Celsius
+- `water`: Water level (low, medium, high)
+- `tds`: Total Dissolved Solids in parts per million (ppm)
 
-**Use your preferred IDE**
+## Hardware Setup (not included in this repo)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+For a complete system, you would need:
+1. Arduino with pH, temperature, water level, and TDS sensors
+2. Raspberry Pi connected to Arduino via USB
+3. Script on Raspberry Pi to read serial data from Arduino and send to this API
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Deployment
 
-Follow these steps:
-
+### For the Web App
+Follow the standard Lovable deployment process:
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
+# Install dependencies
 npm i
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start the development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### For the Raspberry Pi (conceptual)
+On your Raspberry Pi, you would need a simple script to:
+1. Read data from Arduino's serial port
+2. Send this data to the API endpoint
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Example Python script (not included):
+```python
+import serial
+import requests
+import time
 
-**Use GitHub Codespaces**
+# Connect to Arduino's serial port
+ser = serial.Serial('/dev/ttyUSB0', 9600)
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+# API endpoint (replace with your deployed URL)
+api_url = "https://your-deployed-app.com/api/readings"
 
-## What technologies are used for this project?
+while True:
+    # Read data from Arduino
+    data = ser.readline().decode('utf-8').strip()
+    
+    # Send to API
+    response = requests.post(api_url, json={"data": data})
+    
+    # Wait before next reading
+    time.sleep(5)
+```
 
-This project is built with .
+## Technologies Used
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- React with TypeScript
+- Tailwind CSS for styling
+- shadcn/ui for UI components
 
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/b50ff209-b4ca-48d2-9dd5-77fbf6808bde) and click on Share -> Publish.
-
-## I want to use a custom domain - is that possible?
-
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
