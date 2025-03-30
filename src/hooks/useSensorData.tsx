@@ -42,10 +42,12 @@ export function useSensorData() {
   const [isLoading, setIsLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'unknown'>('unknown');
   const [apiUrl, setApiUrl] = useState(API_BASE_URL);
+  const [lastCheckTime, setLastCheckTime] = useState<Date>(new Date());
 
   // Helper function to find working API URL
   const findWorkingApiUrl = async (): Promise<string | null> => {
     console.log(`[${new Date().toISOString()}] Searching for working API URL...`);
+    setLastCheckTime(new Date());
     
     // First try the current API URL
     try {
@@ -282,6 +284,7 @@ export function useSensorData() {
     isLoading,
     connectionStatus,
     refreshData: fetchAllReadings,
-    apiUrl
+    apiUrl,
+    lastCheckTime
   };
 }
