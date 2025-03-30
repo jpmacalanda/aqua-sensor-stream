@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import sys
+import glob
 from datetime import datetime
 
 # Configure logging
@@ -18,8 +19,8 @@ logging.basicConfig(
     ]
 )
 
-# Configure these settings
-SERIAL_PORT = '/dev/ttyUSB0'  # Change this to match your Arduino's serial port
+# Default port if auto-detection fails
+DEFAULT_SERIAL_PORT = '/dev/ttyUSB0'
 BAUD_RATE = 9600
 API_URL = 'http://api:3001/api/readings'  # Use service name in docker-compose
 READ_INTERVAL = 5  # Seconds between readings
@@ -29,6 +30,34 @@ ALTERNATIVE_API_URLS = [
     'http://localhost:3001/api/readings',
     'http://127.0.0.1:3001/api/readings'
 ]
+
+def find_arduino_port():
+    """Automatically find Arduino serial port"""
+    # Common patterns for Arduino/CH341 devices
+    if sys.platform.startswith('win'):
+        ports = list(glob.glob('COM[0-9]*'))
+    else:
+        # Check both USB and ACM devices (different Arduino models use different types)
+        usb_ports = glob.glob('/dev/ttyUSB*')
+        acm_ports = glob.glob('/dev/ttyACM*')
+        ports = usb_ports + acm_ports
+    
+    if not ports:
+        logging.warning("No USB serial ports found")
+        return None
+    
+    # Try connecting to each port to find a working one
+    for port in ports:
+        try:
+            logging.info(f"Testing port: {port}")
+            s = serial.Serial(port, BAUD_RATE, timeout=1)
+            s.close()
+            logging.info(f"Found working port: {port}")
+            return port
+        except (OSError, serial.SerialException) as e:
+            logging.warning(f"Port {port} unavailable: {str(e)}")
+    
+    return None
 
 def check_api_connection():
     """Test connectivity to API server and determine best URL"""
@@ -51,8 +80,6 @@ def check_api_connection():
 
 def list_serial_ports():
     """List all available serial ports"""
-    import glob
-    
     if sys.platform.startswith('win'):
         ports = ['COM%s' % (i + 1) for i in range(256)]
     elif sys.platform.startswith('linux') or sys.platform.startswith('cygwin'):
@@ -77,9 +104,16 @@ def list_serial_ports():
 def main():
     logging.info("=" * 50)
     logging.info(f"Starting Arduino sensor reader script")
-    logging.info(f"Serial port: {SERIAL_PORT}")
     logging.info(f"Baud rate: {BAUD_RATE}")
     logging.info(f"Read interval: {READ_INTERVAL} seconds")
+    
+    # Auto-detect Arduino port
+    serial_port = find_arduino_port()
+    if not serial_port:
+        logging.warning(f"Could not auto-detect Arduino port. Will try default: {DEFAULT_SERIAL_PORT}")
+        serial_port = DEFAULT_SERIAL_PORT
+    
+    logging.info(f"Using serial port: {serial_port}")
     
     # Check for API connectivity and get best URL
     working_api_url = check_api_connection()
@@ -97,42 +131,22 @@ def main():
         for port in available_ports:
             logging.info(f"  - {port}")
     
-    # Check if specified serial port exists
-    if not os.path.exists(SERIAL_PORT):
-        logging.error(f"Specified serial port {SERIAL_PORT} does not exist!")
-        logging.info(f"Available devices in /dev:")
-        for device in os.listdir('/dev'):
-            if 'tty' in device:
-                logging.info(f"  - /dev/{device}")
-        
-        # Try to find a USB device automatically
-        usb_devices = [device for device in available_ports if 'USB' in device or 'ACM' in device]
-        if usb_devices:
-            logging.info(f"Found USB devices: {usb_devices}")
-            logging.info(f"Trying to use {usb_devices[0]} instead")
-            serial_port = usb_devices[0]
-        else:
-            logging.error("No USB devices found. Please check Arduino connection.")
-            return
-    else:
-        serial_port = SERIAL_PORT
-    
     # Local storage for readings if API is unreachable
     local_readings = []
     
     try:
         # Connect to Arduino's serial port
-        ser = serial.Serial(serial_port, BAUD_RATE, timeout=5)
-        logging.info(f"Connected to Arduino on {serial_port}")
-        
-        # Flush initial data
-        logging.info("Flushing initial data from serial buffer")
-        ser.flushInput()
-        time.sleep(2)
-        
-        connection_failures = 0
+        ser = None
         while True:
             try:
+                if ser is None:
+                    logging.info(f"Attempting to connect to {serial_port}")
+                    ser = serial.Serial(serial_port, BAUD_RATE, timeout=5)
+                    logging.info(f"Connected to Arduino on {serial_port}")
+                    # Flush initial data
+                    ser.flushInput()
+                    time.sleep(2)
+                
                 # Read data from Arduino
                 logging.info("Waiting for data from Arduino...")
                 serial_line = ser.readline()
@@ -178,7 +192,6 @@ def main():
                         
                         if response.status_code == 201:
                             logging.info("Data successfully sent to API")
-                            connection_failures = 0
                             
                             # Send any cached readings
                             if local_readings:
@@ -199,21 +212,17 @@ def main():
                         else:
                             logging.error(f"API error: {response.status_code}")
                             logging.error(response.text)
-                            connection_failures += 1
                     except requests.exceptions.RequestException as e:
                         logging.error(f"Connection error: {str(e)}")
                         logging.info("Storing reading locally")
                         local_readings.append(data)
-                        connection_failures += 1
                         
                         # Check if we need to find a new API URL
-                        if connection_failures > 5:
-                            logging.warning("Multiple connection failures, checking for alternative API URL")
-                            new_api_url = check_api_connection()
-                            if new_api_url and new_api_url != working_api_url:
-                                logging.info(f"Switching to new API URL: {new_api_url}")
-                                working_api_url = new_api_url
-                                connection_failures = 0
+                        logging.warning("Connection failure, checking for alternative API URL")
+                        new_api_url = check_api_connection()
+                        if new_api_url:
+                            logging.info(f"Switching to new API URL: {new_api_url}")
+                            working_api_url = new_api_url
                 else:
                     # Store locally
                     logging.info("API unavailable, storing reading locally")
@@ -229,14 +238,22 @@ def main():
                 time.sleep(READ_INTERVAL)
                 
             except serial.SerialException as e:
-                logging.error(f"Serial error during read: {str(e)}")
-                logging.info("Attempting to reconnect to serial port...")
+                logging.error(f"Serial error: {str(e)}")
+                logging.info("Arduino disconnected or port changed. Attempting to find it again...")
                 try:
-                    ser.close()
+                    if ser:
+                        ser.close()
+                    ser = None
                     time.sleep(2)
-                    ser = serial.Serial(serial_port, BAUD_RATE, timeout=5)
-                    ser.flushInput()
-                    logging.info("Successfully reconnected to serial port")
+                    
+                    # Try to find Arduino again
+                    new_port = find_arduino_port()
+                    if new_port:
+                        serial_port = new_port
+                        logging.info(f"Found Arduino on new port: {serial_port}")
+                    else:
+                        logging.warning("Could not find Arduino. Will retry...")
+                        time.sleep(5)
                 except Exception as reconnect_error:
                     logging.error(f"Failed to reconnect: {str(reconnect_error)}")
                     time.sleep(5)  # Wait before trying again
@@ -247,16 +264,14 @@ def main():
     
     except KeyboardInterrupt:
         logging.info("Script terminated by user")
-    except serial.SerialException as e:
-        logging.error(f"Serial connection error: {str(e)}")
-        logging.error(f"Make sure Arduino is connected to {serial_port}")
     except Exception as e:
         logging.error(f"Unexpected error: {str(e)}")
     finally:
         logging.info("Shutting down")
         try:
-            ser.close()
-            logging.info("Serial port closed")
+            if ser:
+                ser.close()
+                logging.info("Serial port closed")
         except:
             pass
         
