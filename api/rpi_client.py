@@ -19,8 +19,9 @@ logging.basicConfig(
     ]
 )
 
-# Default port if auto-detection fails
-DEFAULT_SERIAL_PORT = '/dev/ttyUSB0'
+# List of possible USB ports to try for Arduino
+POSSIBLE_USB_PORTS = ['/dev/ttyUSB0', '/dev/ttyUSB1', '/dev/ttyUSB2', '/dev/ttyUSB3']
+DEFAULT_SERIAL_PORT = '/dev/ttyUSB0'  # Default fallback
 BAUD_RATE = 9600
 API_URL = 'http://api:3001/api/readings'  # Use service name in docker-compose
 READ_INTERVAL = 5  # Seconds between readings
@@ -37,8 +38,14 @@ def find_arduino_port():
     if sys.platform.startswith('win'):
         ports = list(glob.glob('COM[0-9]*'))
     else:
-        # Check both USB and ACM devices (different Arduino models use different types)
-        usb_ports = glob.glob('/dev/ttyUSB*')
+        # Check for multiple USB ports (USB0-USB3)
+        usb_ports = []
+        for port in POSSIBLE_USB_PORTS:
+            if os.path.exists(port):
+                usb_ports.append(port)
+                logging.info(f"Found USB port: {port}")
+        
+        # Also check for other common Arduino port types
         acm_ports = glob.glob('/dev/ttyACM*')
         ports = usb_ports + acm_ports
     
@@ -61,6 +68,7 @@ def find_arduino_port():
 
 def check_api_connection():
     """Test connectivity to API server and determine best URL"""
+    # ... keep existing code (API connection checking function)
     all_urls = [API_URL] + ALTERNATIVE_API_URLS
     
     for url in all_urls:
@@ -80,6 +88,7 @@ def check_api_connection():
 
 def list_serial_ports():
     """List all available serial ports"""
+    # ... keep existing code (serial port listing function)
     if sys.platform.startswith('win'):
         ports = ['COM%s' % (i + 1) for i in range(256)]
     elif sys.platform.startswith('linux') or sys.platform.startswith('cygwin'):
@@ -104,6 +113,7 @@ def list_serial_ports():
 def main():
     logging.info("=" * 50)
     logging.info(f"Starting Arduino sensor reader script")
+    logging.info(f"Checking USB ports: {', '.join(POSSIBLE_USB_PORTS)}")
     logging.info(f"Baud rate: {BAUD_RATE}")
     logging.info(f"Read interval: {READ_INTERVAL} seconds")
     
