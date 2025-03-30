@@ -1,6 +1,10 @@
 
 // This file simulates a RESTful API service that would interact with Arduino data
-import { saveSensorReading, getLatestReading, getAllReadings } from './databaseService';
+import { 
+  saveSensorReading, 
+  getLatestSensorReading, 
+  getAllSensorReadings 
+} from './databaseService';
 
 export interface SensorData {
   pH: number;
@@ -50,11 +54,11 @@ export const addSensorReading = (dataString: string): SensorData | null => {
 // GET - Retrieve the latest reading
 export const getLatestReading = (): SensorData | null => {
   // Use the database service to get the latest reading
-  return getLatestReading();
+  return getLatestSensorReading();
 };
 
 // GET - Retrieve all readings
 export const getAllReadings = (): SensorData[] => {
   // Use the database service to get all readings
-  return getAllReadings();
+  return getAllSensorReadings();
 };

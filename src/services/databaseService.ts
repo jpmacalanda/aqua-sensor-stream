@@ -24,7 +24,7 @@ export const saveSensorReading = (reading: SensorData): SensorData => {
  * Gets the latest sensor reading from the database
  * @returns The latest sensor reading or null if none exists
  */
-export const getLatestReading = (): SensorData | null => {
+export const getLatestSensorReading = (): SensorData | null => {
   if (sensorReadings.length === 0) return null;
   return sensorReadings[sensorReadings.length - 1];
 };
@@ -33,8 +33,17 @@ export const getLatestReading = (): SensorData | null => {
  * Gets all sensor readings from the database
  * @returns An array of all sensor readings
  */
-export const getAllReadings = (): SensorData[] => {
+export const getAllSensorReadings = (): SensorData[] => {
   return [...sensorReadings];
+};
+
+/**
+ * Filters sensor readings based on criteria
+ * @param criteria Function that returns true for readings to include
+ * @returns Filtered array of sensor readings
+ */
+export const filterSensorReadings = (criteria: (reading: SensorData) => boolean): SensorData[] => {
+  return sensorReadings.filter(criteria);
 };
 
 /**
