@@ -1,10 +1,12 @@
-
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from "sonner";
 
 // API base URL - change this to match your setup
-const API_URL = 'http://localhost:3001/api';
+// Use the API service name in production (Docker), fallback to localhost for development
+const API_URL = import.meta.env.PROD 
+  ? 'http://api:3001/api'  // Docker service name
+  : 'http://localhost:3001/api';  // Local development
 
 interface SensorData {
   pH: number;

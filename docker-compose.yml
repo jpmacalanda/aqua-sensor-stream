@@ -11,6 +11,10 @@ services:
     restart: unless-stopped
     depends_on:
       - api
+    environment:
+      - NODE_ENV=production
+    networks:
+      - aqua-network
     logging:
       driver: "json-file"
       options:
@@ -30,6 +34,9 @@ services:
     # Make sure it listens on all interfaces
     environment:
       - PORT=3001
+      - NODE_ENV=production
+    networks:
+      - aqua-network
     logging:
       driver: "json-file"
       options:
@@ -43,3 +50,6 @@ services:
       retries: 3
       start_period: 10s
 
+networks:
+  aqua-network:
+    driver: bridge
