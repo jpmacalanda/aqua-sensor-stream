@@ -34,7 +34,9 @@ const SensorDisplay: React.FC<SensorDisplayProps> = ({ data, isLoading = false }
   }
 
   // Get water level color
-  const getWaterLevelColor = (level: string) => {
+  const getWaterLevelColor = (level: string | undefined) => {
+    if (!level) return 'bg-gray-500';
+    
     switch (level.toLowerCase()) {
       case 'low':
         return 'bg-red-500';
@@ -48,14 +50,15 @@ const SensorDisplay: React.FC<SensorDisplayProps> = ({ data, isLoading = false }
   };
 
   // Get pH color
-  const getPHColor = (ph: number) => {
+  const getPHColor = (ph: number | undefined) => {
+    if (ph === undefined) return 'text-gray-500';
     if (ph < 6.5) return 'text-red-500';
     if (ph > 7.5) return 'text-blue-500';
     return 'text-green-500';
   };
 
-  const formatTime = (timestamp: number) => {
-    return new Date(timestamp).toLocaleTimeString();
+  const formatTime = (timestamp: number | undefined) => {
+    return timestamp ? new Date(timestamp).toLocaleTimeString() : 'Unknown';
   };
 
   // Add a safe formatter to handle potential undefined values
@@ -104,7 +107,7 @@ const SensorDisplay: React.FC<SensorDisplayProps> = ({ data, isLoading = false }
           <CardContent>
             <div className="flex items-center space-x-2">
               <Badge className={`${getWaterLevelColor(data.water)} capitalize`}>
-                {data.water}
+                {data.water || 'Unknown'}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground mt-3">
@@ -120,7 +123,7 @@ const SensorDisplay: React.FC<SensorDisplayProps> = ({ data, isLoading = false }
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {data.tds} ppm
+              {data.tds !== undefined ? `${data.tds} ppm` : 'N/A'}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Last updated at {formatTime(data.timestamp)}
@@ -136,7 +139,7 @@ const SensorDisplay: React.FC<SensorDisplayProps> = ({ data, isLoading = false }
         </CardHeader>
         <CardContent>
           <pre className="bg-gray-100 p-4 rounded text-sm overflow-x-auto">
-            {`pH:${safeFormat(data.pH)},temp:${safeFormat(data.temp, 2)},water:${data.water},tds:${data.tds}`}
+            {`pH:${safeFormat(data.pH)},temp:${safeFormat(data.temp, 2)},water:${data.water || 'unknown'},tds:${data.tds !== undefined ? data.tds : 'N/A'}`}
           </pre>
         </CardContent>
       </Card>
