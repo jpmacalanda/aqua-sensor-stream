@@ -37,7 +37,7 @@ For a complete system, you would need:
 
 ## Deployment
 
-### For the Web App
+### Standard Deployment
 Follow the standard Lovable deployment process:
 ```sh
 # Install dependencies
@@ -45,6 +45,20 @@ npm i
 
 # Start the development server
 npm run dev
+```
+
+### Docker Deployment
+The project is fully dockerized for easy deployment:
+
+```sh
+# Build and start the containers
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop the containers
+docker-compose down
 ```
 
 ### For the Raspberry Pi (conceptual)
@@ -80,4 +94,5 @@ while True:
 - React with TypeScript
 - Tailwind CSS for styling
 - shadcn/ui for UI components
+- Docker for containerization
 
