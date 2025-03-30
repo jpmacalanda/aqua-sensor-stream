@@ -11,6 +11,11 @@ services:
     restart: unless-stopped
     depends_on:
       - api
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   api:
     build:
@@ -21,4 +26,9 @@ services:
     restart: unless-stopped
     volumes:
       - ./api/data:/app/data
-
+      - ./api/logs:/app/logs
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
