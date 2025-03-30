@@ -19,8 +19,8 @@ logging.basicConfig(
     ]
 )
 
-# List of possible USB ports to try for Arduino
-POSSIBLE_USB_PORTS = ['/dev/ttyUSB0', '/dev/ttyUSB1', '/dev/ttyUSB2', '/dev/ttyUSB3']
+# List of possible USB ports to try for Arduino - put the most likely ones first
+POSSIBLE_USB_PORTS = ['/dev/ttyUSB0', '/dev/ttyACM0', '/dev/ttyUSB1', '/dev/ttyUSB2', '/dev/ttyUSB3']
 DEFAULT_SERIAL_PORT = '/dev/ttyUSB0'  # Default fallback
 BAUD_RATE = 9600
 API_URL = 'http://api:3001/api/readings'  # Use service name in docker-compose
@@ -34,6 +34,17 @@ ALTERNATIVE_API_URLS = [
 
 def find_arduino_port():
     """Automatically find Arduino serial port"""
+    # First check if the default port exists, as it's the most likely
+    if os.path.exists(DEFAULT_SERIAL_PORT):
+        logging.info(f"Default port {DEFAULT_SERIAL_PORT} exists, testing it first")
+        try:
+            s = serial.Serial(DEFAULT_SERIAL_PORT, BAUD_RATE, timeout=1)
+            s.close()
+            logging.info(f"Default port {DEFAULT_SERIAL_PORT} is working!")
+            return DEFAULT_SERIAL_PORT
+        except (OSError, serial.SerialException) as e:
+            logging.warning(f"Default port {DEFAULT_SERIAL_PORT} exists but cannot be opened: {str(e)}")
+    
     # Common patterns for Arduino/CH341 devices
     if sys.platform.startswith('win'):
         ports = list(glob.glob('COM[0-9]*'))
@@ -69,46 +80,46 @@ def find_arduino_port():
 def check_api_connection():
     """Test connectivity to API server and determine best URL"""
     # ... keep existing code (API connection checking function)
-    all_urls = [API_URL] + ALTERNATIVE_API_URLS
     
-    for url in all_urls:
-        try:
-            base_url = url.rsplit('/', 1)[0]  # Remove 'readings' from the end
-            test_url = f"{base_url}"
-            logging.info(f"Testing API connection to: {test_url}")
-            response = requests.get(test_url, timeout=5)
-            if response.status_code == 200:
-                logging.info(f"Successfully connected to API at: {test_url}")
-                return url
-        except requests.exceptions.RequestException as e:
-            logging.warning(f"Failed to connect to {test_url}: {str(e)}")
-    
-    logging.error("Failed to connect to API server on all URLs")
-    return None
-
 def list_serial_ports():
     """List all available serial ports"""
     # ... keep existing code (serial port listing function)
-    if sys.platform.startswith('win'):
-        ports = ['COM%s' % (i + 1) for i in range(256)]
-    elif sys.platform.startswith('linux') or sys.platform.startswith('cygwin'):
-        # This excludes your current terminal "/dev/tty"
-        ports = glob.glob('/dev/tty[A-Za-z]*')
-    elif sys.platform.startswith('darwin'):
-        ports = glob.glob('/dev/tty.*')
-    else:
-        raise EnvironmentError('Unsupported platform')
+
+def test_read_from_port(port, attempts=3):
+    """Test reading from a port to see if it returns valid sensor data"""
+    logging.info(f"Testing for sensor data on {port}")
+    try:
+        ser = serial.Serial(port, BAUD_RATE, timeout=3)
+        ser.flushInput()
+        
+        for i in range(attempts):
+            logging.info(f"Reading attempt {i+1} from {port}")
+            try:
+                serial_line = ser.readline()
+                if serial_line:
+                    try:
+                        data = serial_line.decode('utf-8').strip()
+                        logging.info(f"Received: {data}")
+                        
+                        # Check if it contains expected Arduino sensor format (pH, temp, etc.)
+                        if "pH:" in data and "temp:" in data:
+                            logging.info(f"Valid sensor data detected on {port}: {data}")
+                            ser.close()
+                            return True
+                        else:
+                            logging.info(f"Data doesn't match expected format: {data}")
+                    except UnicodeDecodeError:
+                        logging.info(f"Received non-UTF8 data: {serial_line!r}")
+            except Exception as e:
+                logging.warning(f"Error reading from port: {str(e)}")
+            
+            time.sleep(1)
+        
+        ser.close()
+    except Exception as e:
+        logging.warning(f"Could not open {port} for testing: {str(e)}")
     
-    result = []
-    for port in ports:
-        try:
-            s = serial.Serial(port)
-            s.close()
-            result.append(port)
-        except (OSError, serial.SerialException):
-            pass
-    
-    return result
+    return False
 
 def main():
     logging.info("=" * 50)
@@ -117,11 +128,32 @@ def main():
     logging.info(f"Baud rate: {BAUD_RATE}")
     logging.info(f"Read interval: {READ_INTERVAL} seconds")
     
+    # List all available serial ports first for diagnostic purposes
+    logging.info("Available serial ports:")
+    available_ports = list_serial_ports()
+    if not available_ports:
+        logging.error("No serial ports found!")
+    else:
+        for port in available_ports:
+            logging.info(f"  - {port}")
+    
     # Auto-detect Arduino port
     serial_port = find_arduino_port()
     if not serial_port:
         logging.warning(f"Could not auto-detect Arduino port. Will try default: {DEFAULT_SERIAL_PORT}")
         serial_port = DEFAULT_SERIAL_PORT
+    
+    # Test the port more thoroughly to make sure it's actually an Arduino sending sensor data
+    if not test_read_from_port(serial_port):
+        logging.warning(f"Port {serial_port} doesn't appear to be sending valid sensor data.")
+        # Try to find another port that might be sending valid data
+        for port in POSSIBLE_USB_PORTS:
+            if port != serial_port and os.path.exists(port):
+                logging.info(f"Testing alternative port: {port}")
+                if test_read_from_port(port):
+                    logging.info(f"Found valid sensor data on {port}")
+                    serial_port = port
+                    break
     
     logging.info(f"Using serial port: {serial_port}")
     
@@ -131,15 +163,6 @@ def main():
         logging.info(f"Using API URL: {working_api_url}")
     else:
         logging.error("Could not connect to API. Will store readings locally until connection is restored.")
-    
-    # List available serial ports
-    logging.info("Available serial ports:")
-    available_ports = list_serial_ports()
-    if not available_ports:
-        logging.error("No serial ports found!")
-    else:
-        for port in available_ports:
-            logging.info(f"  - {port}")
     
     # Local storage for readings if API is unreachable
     local_readings = []
@@ -167,6 +190,7 @@ def main():
                 
                 try:
                     data = serial_line.decode('utf-8').strip()
+                    logging.info(f"Raw data received: {repr(data)}")
                 except UnicodeDecodeError:
                     logging.error(f"Failed to decode data: {serial_line!r}")
                     time.sleep(1)
