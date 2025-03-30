@@ -1,15 +1,14 @@
-// This file simulates a RESTful API service that would interact with Arduino data
 
-interface SensorData {
+// This file simulates a RESTful API service that would interact with Arduino data
+import { saveSensorReading, getLatestReading, getAllReadings } from './databaseService';
+
+export interface SensorData {
   pH: number;
   temp: number;
   water: string;
   tds: number;
   timestamp: number;
 }
-
-// In-memory storage of sensor readings (in a real app, this would use a database)
-let sensorReadings: SensorData[] = [];
 
 // Function to parse the raw data string from Arduino
 export const parseArduinoData = (dataString: string): SensorData | null => {
@@ -40,13 +39,9 @@ export const addSensorReading = (dataString: string): SensorData | null => {
   const parsedData = parseArduinoData(dataString);
   
   if (parsedData) {
-    sensorReadings.push(parsedData);
+    // Use the database service to save the reading
+    saveSensorReading(parsedData);
     console.log('Added new sensor reading:', parsedData);
-    
-    // Keep only the most recent 100 readings
-    if (sensorReadings.length > 100) {
-      sensorReadings = sensorReadings.slice(-100);
-    }
   }
   
   return parsedData;
@@ -54,11 +49,12 @@ export const addSensorReading = (dataString: string): SensorData | null => {
 
 // GET - Retrieve the latest reading
 export const getLatestReading = (): SensorData | null => {
-  if (sensorReadings.length === 0) return null;
-  return sensorReadings[sensorReadings.length - 1];
+  // Use the database service to get the latest reading
+  return getLatestReading();
 };
 
 // GET - Retrieve all readings
 export const getAllReadings = (): SensorData[] => {
-  return [...sensorReadings];
+  // Use the database service to get all readings
+  return getAllReadings();
 };
