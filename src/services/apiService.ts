@@ -39,26 +39,32 @@ export const parseArduinoData = (dataString: string): SensorData | null => {
 };
 
 // POST - Add new sensor reading
-export const addSensorReading = (dataString: string): SensorData | null => {
+export const addSensorReading = async (dataString: string): Promise<SensorData | null> => {
   const parsedData = parseArduinoData(dataString);
   
   if (parsedData) {
-    // Use the database service to save the reading
-    saveSensorReading(parsedData);
-    console.log('Added new sensor reading:', parsedData);
+    try {
+      // Use the database service to save the reading
+      await saveSensorReading(parsedData);
+      console.log('Added new sensor reading:', parsedData);
+      return parsedData;
+    } catch (error) {
+      console.error('Failed to save sensor reading:', error);
+      return null;
+    }
   }
   
-  return parsedData;
+  return null;
 };
 
 // GET - Retrieve the latest reading
-export const getLatestReading = (): SensorData | null => {
+export const getLatestReading = async (): Promise<SensorData | null> => {
   // Use the database service to get the latest reading
-  return getLatestSensorReading();
+  return await getLatestSensorReading();
 };
 
 // GET - Retrieve all readings
-export const getAllReadings = (): SensorData[] => {
+export const getAllReadings = async (): Promise<SensorData[]> => {
   // Use the database service to get all readings
-  return getAllSensorReadings();
+  return await getAllSensorReadings();
 };
