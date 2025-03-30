@@ -50,6 +50,33 @@ services:
       retries: 3
       start_period: 10s
 
+  arduino-reader:
+    build:
+      context: ./arduino-reader
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    privileged: true  # Needed for USB access
+    volumes:
+      - ./arduino-reader/logs:/app/logs
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+      - /dev/ttyUSB1:/dev/ttyUSB1
+      - /dev/ttyACM0:/dev/ttyACM0
+    environment:
+      - ARDUINO_SERIAL_PORT=/dev/ttyUSB0
+      - ARDUINO_BAUD_RATE=9600
+      - API_URL=http://api:3001/api/readings
+      - READ_INTERVAL=5
+    depends_on:
+      - api
+    networks:
+      - aqua-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 networks:
   aqua-network:
     driver: bridge
